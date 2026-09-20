@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>บัญชีของฉัน</title>
+<style>
+:root{--bg:#f4f7fb;--card:#fff;--text:#152033;--muted:#7b8798;--blue:#2583f7;--red:#e74c3c;--green:#16a56a;--line:#e7edf5}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);font-family:system-ui,-apple-system,"Noto Sans Thai",sans-serif;color:var(--text)}
+.app{max-width:480px;margin:auto;min-height:100vh;padding:18px 16px 88px}
+h1{font-size:24px;margin:8px 0 16px}.card{background:var(--card);border-radius:20px;padding:18px;margin-bottom:14px;box-shadow:0 4px 18px #18324a0d}
+.balance{font-size:34px;font-weight:800;margin:4px 0 16px}.muted{color:var(--muted);font-size:13px}
+.stats{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}.stat{background:#f7f9fc;border-radius:14px;padding:10px 8px}.stat b{display:block;font-size:16px;margin-top:3px}.green{color:var(--green)}.red{color:var(--red)}.blue{color:var(--blue)}
+.section-title{font-size:17px;font-weight:800;margin:18px 2px 10px}.row{display:flex;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.row:last-child{border:0}.icon{width:42px;height:42px;border-radius:13px;display:grid;place-items:center;background:#f0f5ff;font-size:20px}.grow{flex:1}.amount{font-weight:800}.fab{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);width:min(440px,calc(100% - 32px));border:0;border-radius:18px;background:var(--blue);color:white;padding:15px;font-size:17px;font-weight:800;box-shadow:0 8px 24px #2583f744}
+button{font:inherit;cursor:pointer}.back{border:0;background:none;font-size:24px;padding:0 8px 0 0}.top{display:flex;align-items:center;gap:8px;margin-bottom:16px}
+label{display:block;font-weight:700;margin:14px 0 7px}.input{width:100%;border:1px solid #dce4ef;border-radius:13px;padding:13px;background:white;font-size:17px;outline:none}.tabs{display:grid;grid-template-columns:1fr 1fr;background:#eef2f7;border-radius:14px;padding:4px}.tabs button{border:0;background:transparent;border-radius:11px;padding:10px;font-weight:800}.tabs .active{background:white;box-shadow:0 2px 8px #0000000d}.cats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}.cat{border:2px solid transparent;background:#f5f7fb;border-radius:14px;padding:10px 4px;text-align:center}.cat span{display:block;font-size:22px}.cat small{font-size:11px}.cat.selected{border-color:var(--blue);background:#eef6ff}.primary{width:100%;border:0;border-radius:14px;background:var(--blue);color:#fff;padding:14px;font-weight:800;margin-top:18px}.secondary{width:100%;border:1px solid #dce4ef;border-radius:14px;background:white;padding:12px;font-weight:700;margin-top:9px}.receipt{border:2px dashed #dce4ef;border-radius:16px;padding:18px;text-align:center;color:var(--muted)}.receipt img{max-width:100%;max-height:260px;border-radius:12px;margin-top:10px}.hidden{display:none}.empty{text-align:center;color:var(--muted);padding:25px}
+</style>
+</head>
+<body>
+<div id="app" class="app"></div>
+<script>
+const CATS=[
+ ["อาหาร","🍜"],["ของใช้","🛒"],["เดินทาง","🚗"],["บ้าน","🏠"],
+ ["บิล","💳"],["ช้อปปิ้ง","🛍️"],["บันเทิง","🎮"],["อื่น ๆ","📦"]
+];
+let tx=JSON.parse(localStorage.getItem("myAccountTx")||"[]");
+let screen="home", type="expense", selectedCat="อาหาร", receipt=null;
+
+function money(n){return new Intl.NumberFormat("th-TH",{minimumFractionDigits:2}).format(n)}
+function save(){localStorage.setItem("myAccountTx",JSON.stringify(tx))}
+function catIcon(name){return (CATS.find(x=>x[0]===name)||["","📦"])[1]}
+function totals(){
+ const income=tx.filter(x=>x.type==="income").reduce((s,x)=>s+x.amount,0);
+ const expense=tx.filter(x=>x.type==="expense").reduce((s,x)=>s+x.amount,0);
+ return {income,expense,balance:income-expense};
+}
+function render(){
+ screen==="home"?home():screen==="add"?add():list();
+}
+function home(){
+ const t=totals(), recent=[...tx].sort((a,b)=>b.created-a.created).slice(0,6);
+ app.innerHTML=`
+ <h1>บัญชีของฉัน ⚡</h1>
+ <div class="card">
+  <div class="muted">เงินคงเหลือ</div><div class="balance">฿ ${money(t.balance)}</div>
+  <div class="stats">
+   <div class="stat"><div class="muted">รายรับวันนี้</div><b class="green">+${money(dayTotal("income"))}</b></div>
+   <div class="stat"><div class="muted">รายจ่ายวันนี้</div><b class="red">-${money(dayTotal("expense"))}</b></div>
+   <div class="stat"><div class="muted">สุทธิวันนี้</div><b class="blue">${money(dayTotal("income")-dayTotal("expense"))}</b></div>
+  </div>
+ </div>
+ <div class="section-title">รายการล่าสุด</div>
+ <div class="card">${recent.length?recent.map(item).join(""):`<div class="empty">ยังไม่มีรายการ<br>กด “เพิ่มรายการ” เพื่อเริ่มเลย</div>`}</div>
+ <button class="fab" onclick="go('add')">＋ เพิ่มรายการ</button>`;
+}
+function dayTotal(tp){
+ const d=new Date().toDateString();
+ return tx.filter(x=>x.type===tp&&new Date(x.date).toDateString()===d).reduce((s,x)=>s+x.amount,0)
+}
+function item(x){
+ return `<div class="row"><div class="icon">${x.type==="income"?"🟢":catIcon(x.cat)}</div><div class="grow"><b>${esc(x.name||x.cat||"รายการ")}</b><div class="muted">${x.type==="income"?"รายรับ":x.cat} · ${new Date(x.date).toLocaleDateString("th-TH")}</div></div><div class="amount ${x.type==="income"?"green":"red"}">${x.type==="income"?"+":"-"}฿${money(x.amount)}</div></div>`;
+}
+function add(){
+ app.innerHTML=`
+ <div class="top"><button class="back" onclick="go('home')">‹</button><h1 style="margin:0">เพิ่มรายการ</h1></div>
+ <div class="card">
+  <div class="tabs"><button class="${type==="expense"?"active":""}" onclick="setType('expense')">รายจ่าย</button><button class="${type==="income"?"active":""}" onclick="setType('income')">รายรับ</button></div>
+  <label>จำนวนเงิน</label><input id="amount" class="input" inputmode="decimal" placeholder="0.00">
+  <label>ชื่อรายการ <span class="muted">(ไม่บังคับ)</span></label><input id="name" class="input" placeholder="เช่น 7-Eleven">
+  ${type==="expense"?`<label>เลือกหมวดหมู่</label><div class="cats">${CATS.map(c=>`<button class="cat ${selectedCat===c[0]?"selected":""}" onclick="sel('${c[0]}')"><span>${c[1]}</span><small>${c[0]}</small></button>`).join("")}</div>`:""}
+  <label>หมายเหตุ <span class="muted">(ไม่บังคับ)</span></label><input id="note" class="input" placeholder="เช่น ข้าวกลางวัน">
+  <label>รูปสลิป <span class="muted">(ถ้ามี)</span></label>
+  <div class="receipt"><input id="file" type="file" accept="image/*" onchange="pickReceipt(event)">${receipt?`<img src="${receipt}">`:"<div style='margin-top:8px'>เลือกรูปสลิปจากเครื่อง</div>"}</div>
+  <button class="primary" onclick="addTx()">บันทึก</button>
+ </div>`;
+}
+function setType(t){type=t;render()} function sel(c){selectedCat=c;render()}
+function pickReceipt(e){const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{receipt=r.result;render()};r.readAsDataURL(f)}
+function addTx(){
+ const amount=parseFloat(document.getElementById("amount").value);
+ if(!amount||amount<=0){alert("ใส่จำนวนเงินก่อนนะ");return}
+ tx.push({id:crypto.randomUUID(),amount,type,name:document.getElementById("name").value.trim(),cat:type==="expense"?selectedCat:"รายรับ",note:document.getElementById("note").value.trim(),date:new Date().toISOString(),created:Date.now(),receipt});
+ save();receipt=null;type="expense";selectedCat="อาหาร";go("home")
+}
+function list(){
+ const all=[...tx].sort((a,b)=>new Date(b.date)-new Date(a.date));
+ app.innerHTML=`<div class="top"><button class="back" onclick="go('home')">‹</button><h1 style="margin:0">รายการทั้งหมด</h1></div><div class="card">${all.length?all.map(item).join(""):`<div class="empty">ยังไม่มีรายการ</div>`}</div>`;
+}
+function go(s){screen=s;render()}
+function esc(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+render();
+</script>
+</body>
+</html>
