@@ -138,7 +138,7 @@ function totals(){return totalsForDate(key())}
 function monthSummary(ym){
  let sales=0,cost=0,count=0,days=[];
  Object.keys(state.sales||{}).filter(d=>d.startsWith(ym)).sort().forEach(d=>{const t=totalsForDate(d);if(t.count||t.sales||t.cost){sales+=t.sales;cost+=t.cost;count+=t.count;days.push({date:d,...t})}});
- const purchaseSpend=state.purchases.filter(x=>x.date?.startsWith(ym)).reduce((sum,x)=>sum+Number(x.price||0),0);
+ const purchaseSpend=state.purchases.filter(x=>x.date?.startsWith(ym)).reduce((sum,x)=>sum+Number(x.totalPaid ?? x.price ?? 0),0);
  return {sales,cost,profit:sales-cost,count,margin:sales?sales-cost>=0?(sales-cost)/sales*100:0:0,days,purchaseSpend,cashNet:sales-purchaseSpend};
 }
 function renderMonthSummary(ym){
@@ -255,43 +255,78 @@ function saveMenu(i){
 }
 function deleteMenu(i){if(confirm("ลบเมนูนี้?")){state.menus.splice(i,1);save();renderMenus()}}
 function purchaseMonth(ym){return state.purchases.filter(x=>x.date?.startsWith(ym)).sort((a,b)=>b.date.localeCompare(a.date)||String(b.id).localeCompare(String(a.id)));}
+function purchasePaid(x){return Number(x.totalPaid ?? x.price ?? 0)}
+function purchaseDesc(x){
+ if(x.packageQty!=null){
+  return `${formatThaiDate(x.date)} · ${Number(x.packageQty)} หน่วยบรรจุ · รวม ${Number(x.totalQuantity||0).toLocaleString('th-TH')} ${x.unit} · ${baht(purchasePaid(x))}`;
+ }
+ return `${formatThaiDate(x.date)} · ซื้อ ${Number(x.qty||0)} ${x.unit||''} · ${baht(purchasePaid(x))}`;
+}
 function renderPurchases(){
- const ym=state.summaryMonth||state.selectedDate.slice(0,7), rows=purchaseMonth(ym), total=rows.reduce((s,x)=>s+Number(x.price||0),0);
+ const ym=state.summaryMonth||state.selectedDate.slice(0,7), rows=purchaseMonth(ym), total=rows.reduce((s,x)=>s+purchasePaid(x),0);
  document.getElementById("content").innerHTML=`
  <div class="section"><h2>รายการซื้อของ</h2><button onclick="openPurchase()">＋ บันทึกซื้อ</button></div>
  <div class="card" style="margin-bottom:12px"><div class="sub">ยอดซื้อเดือนนี้</div><div style="display:flex;justify-content:space-between;align-items:end"><b style="font-size:25px">${baht(total)}</b><span class="pill">${rows.length} รายการ</span></div></div>
  <div class="date-bar"><span>📅 เดือน</span><input type="month" value="${ym}" onchange="changePurchaseMonth(this.value)"></div>
- <div class="list">${rows.length?rows.map((x,i)=>`<div class="row"><div><div class="name">${x.ingredient}</div><div class="sub">${formatThaiDate(x.date)} · ซื้อ ${Number(x.qty)} ${x.unit} · ${baht(x.price)}</div></div><button class="secondary" style="padding:6px 9px" onclick="deletePurchase('${x.id}')">ลบ</button></div>`).join(''):`<div class="empty">ยังไม่มีรายการซื้อในเดือนนี้</div>`}</div>
- <div class="card" style="margin-top:12px"><b>เชื่อมกับต้นทุนเมนู</b><div class="sub" style="margin-top:5px">เมื่อบันทึกการซื้อ ระบบจะเก็บประวัติการซื้อไว้ และอัปเดตราคาซื้อปัจจุบันของวัตถุดิบนั้นให้เป็นราคาล่าสุด เพื่อคำนวณต้นทุนเมนูรอบต่อไป</div></div>`;
+ <div class="list">${rows.length?rows.map(x=>`<div class="row"><div><div class="name">${x.ingredientName||x.ingredient}</div><div class="sub">${purchaseDesc(x)}</div></div><button class="secondary" style="padding:6px 9px" onclick="deletePurchase('${x.id}')">ลบ</button></div>`).join(''):`<div class="empty">ยังไม่มีรายการซื้อในเดือนนี้</div>`}</div>
+ <div class="card" style="margin-top:12px"><b>ดึงข้อมูลจากวัตถุดิบให้อัตโนมัติ</b><div class="sub" style="margin-top:5px">เลือกวัตถุดิบแล้วกรอกแค่จำนวนหน่วยบรรจุที่ซื้อ ระบบจะใช้ขนาดและราคาจากหน้าวัตถุดิบคำนวณให้เอง</div></div>`;
 }
 function formatThaiDate(d){return new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'short',year:'numeric'}).format(new Date(d+'T00:00:00'));}
 function changePurchaseMonth(v){if(v){state.summaryMonth=v;save();renderPurchases();}}
 function openPurchase(){
- const options=state.ingredients.map(x=>`<option value="${x.name}">${x.name}</option>`).join('');
+ const options=state.ingredients.map((x,i)=>`<option value="${i}">${x.name}</option>`).join('');
  document.getElementById("sheet").innerHTML=`<h3>🛒 บันทึกซื้อของเข้าร้าน</h3>
  <div class="field"><label>วันที่ซื้อ</label><input id="pd" type="date" value="${state.selectedDate}"></div>
  <div class="field"><label>วัตถุดิบ</label><select id="pi">${options}</select></div>
- <div class="field"><label>ปริมาณที่ซื้อ</label><input id="pq" type="number" step=".01" min="0" placeholder="เช่น 2000"></div>
- <div class="field"><label>หน่วย</label><select id="pu"><option value="g">g</option><option value="ml">ml</option><option value="ชิ้น">ชิ้น</option></select></div>
- <div class="field"><label>จ่ายจริง (บาท)</label><input id="pp" type="number" step=".01" min="0" placeholder="เช่น 105"></div>
- <div class="card" style="background:#f8fafc"><div class="sub">ระบบจะเก็บรายการนี้แยกเป็นประวัติ และใช้ราคาซื้อล่าสุดเป็นราคาปัจจุบันของวัตถุดิบ</div></div>
+ <div id="purchase-master" class="card" style="background:#f8fafc;margin-bottom:12px"></div>
+ <div class="field"><label>จำนวนหน่วยบรรจุที่ซื้อ</label><input id="ppq" type="number" step="1" min="1" value="1" inputmode="numeric"></div>
+ <button id="price-toggle" class="secondary" style="width:100%;margin-bottom:10px" onclick="togglePurchasePrice()">✏️ ราคาไม่ตรง? แก้ราคาครั้งนี้</button>
+ <div id="price-edit" class="field" style="display:none"><label>ราคาจริงต่อ 1 หน่วยบรรจุ (บาท)</label><input id="punitprice" type="number" step=".01" min="0" oninput="updatePurchasePreview()"></div>
+ <div id="purchase-preview" class="card" style="margin-bottom:12px"></div>
  <div class="actions"><button class="secondary" onclick="closeModal()">ยกเลิก</button><button class="primary" onclick="savePurchase()">บันทึก</button></div>`;
  showModal();
- document.getElementById('pi').onchange=()=>syncPurchaseUnit();
- syncPurchaseUnit();
+ document.getElementById('pi').onchange=syncPurchaseMaster;
+ document.getElementById('ppq').oninput=updatePurchasePreview;
+ syncPurchaseMaster();
 }
-function syncPurchaseUnit(){const n=document.getElementById('pi').value;const ing=state.ingredients.find(x=>x.name===n);if(ing)document.getElementById('pu').value=ing.unit;}
+function selectedPurchaseIngredient(){const i=Number(document.getElementById('pi')?.value);return state.ingredients[i]||null;}
+function syncPurchaseMaster(){
+ const ing=selectedPurchaseIngredient(); if(!ing)return;
+ document.getElementById('punitprice').value=Number(ing.purchase||0);
+ document.getElementById('price-edit').style.display='none';
+ document.getElementById('price-toggle').textContent='✏️ ราคาไม่ตรง? แก้ราคาครั้งนี้';
+ document.getElementById('purchase-master').innerHTML=`<b>${ing.name}</b><div class="sub" style="margin-top:6px">1 หน่วยบรรจุ = ${Number(ing.quantity||0).toLocaleString('th-TH')} ${ing.unit}<br>ราคา ${baht(Number(ing.purchase||0))} / หน่วยบรรจุ</div>`;
+ updatePurchasePreview();
+}
+function togglePurchasePrice(){
+ const box=document.getElementById('price-edit'), btn=document.getElementById('price-toggle');
+ const show=box.style.display==='none'; box.style.display=show?'block':'none';
+ btn.textContent=show?'ใช้ราคาจากวัตถุดิบ':'✏️ ราคาไม่ตรง? แก้ราคาครั้งนี้';
+ if(!show){const ing=selectedPurchaseIngredient();if(ing)document.getElementById('punitprice').value=Number(ing.purchase||0);}
+ updatePurchasePreview();
+}
+function updatePurchasePreview(){
+ const ing=selectedPurchaseIngredient(); if(!ing)return;
+ const packageQty=Math.max(0,Number(document.getElementById('ppq')?.value||0));
+ const unitPrice=Math.max(0,Number(document.getElementById('punitprice')?.value||ing.purchase||0));
+ const totalQuantity=packageQty*Number(ing.quantity||0), totalPaid=packageQty*unitPrice;
+ document.getElementById('purchase-preview').innerHTML=`<div class="sub">สรุปรายการ</div><div style="display:flex;justify-content:space-between;margin-top:7px"><span>ได้รับทั้งหมด</span><b>${totalQuantity.toLocaleString('th-TH')} ${ing.unit}</b></div><div style="display:flex;justify-content:space-between;margin-top:7px"><span>ยอดจ่าย</span><b style="font-size:20px">${baht(totalPaid)}</b></div>`;
+}
 function savePurchase(){
- const date=document.getElementById('pd').value, ingredient=document.getElementById('pi').value, qty=Number(document.getElementById('pq').value||0), unit=document.getElementById('pu').value, price=Number(document.getElementById('pp').value||0);
- if(!date||!ingredient||qty<=0||price<0)return alert('กรุณากรอกวันที่ วัตถุดิบ ปริมาณ และราคาที่จ่ายให้ครบ');
- const id=Date.now().toString(); state.purchases.push({id,date,ingredient,qty,unit,price});
- const ing=state.ingredients.find(x=>x.name===ingredient);
- if(ing){ing.purchase=price;ing.quantity=qty;ing.unit=unit;}
+ const date=document.getElementById('pd').value, idx=Number(document.getElementById('pi').value), ing=state.ingredients[idx];
+ const packageQty=Number(document.getElementById('ppq').value||0), unitPrice=Number(document.getElementById('punitprice').value||0);
+ if(!date||!ing||packageQty<=0||unitPrice<0)return alert('กรุณาเลือกวัตถุดิบและใส่จำนวนที่ซื้อให้ถูกต้อง');
+ const packageSize=Number(ing.quantity||0), unit=ing.unit, totalQuantity=packageQty*packageSize, totalPaid=packageQty*unitPrice;
+ if(!ing.id)ing.id='ing-'+Date.now().toString()+'-'+idx;
+ const id=Date.now().toString();
+ state.purchases.push({id,date,ingredientId:ing.id,ingredientName:ing.name,ingredient:ing.name,packageQty,packageSize,unit,unitPrice,totalQuantity,totalPaid,qty:totalQuantity,price:totalPaid});
+ // ราคาล่าสุดอัปเดต Master แต่ขนาดบรรจุ/หน่วยเดิมไม่ถูกเปลี่ยน
+ ing.purchase=unitPrice;
  ensureMenuCosts(); save(); closeModal(); state.summaryMonth=date.slice(0,7); state.selectedDate=date; save(); renderPurchases();
 }
 function deletePurchase(id){
  const x=state.purchases.find(p=>String(p.id)===String(id)); if(!x)return;
- if(!confirm(`ลบรายการซื้อ ${x.ingredient} ${baht(x.price)} ?`))return;
+ if(!confirm(`ลบรายการซื้อ ${x.ingredientName||x.ingredient} ${baht(purchasePaid(x))} ?`))return;
  state.purchases=state.purchases.filter(p=>String(p.id)!==String(id)); save(); renderPurchases();
 }
 
