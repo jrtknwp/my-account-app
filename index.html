@@ -184,7 +184,7 @@ function renderSales(){
 async function saveSalesImage(){
  const date=key(), t=totalsForDate(date), data=state.sales[date]||{};
  const items=state.menus.map(m=>({name:m.name,qty:Number(data[m.name]||0),price:saleUnitInfo(date,m.name).price})).filter(x=>x.qty>0);
- const W=1080, pad=76, rowH=64, H=Math.max(900,560+items.length*rowH);
+ const W=1080, pad=76, rowH=64, H=Math.max(1050,760+items.length*rowH);
  const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
  x.fillStyle='#f5f7fa'; x.fillRect(0,0,W,H);
  x.fillStyle='#17395f'; x.fillRect(0,0,W,220);
@@ -195,7 +195,7 @@ async function saveSalesImage(){
  if(!items.length){x.fillStyle='#718096';x.fillText('ยังไม่มียอดขายในวันนี้',pad,y);y+=rowH;}
  items.forEach(it=>{x.fillStyle='#17202a';x.fillText(`${it.name}  ${it.qty} แก้ว`,pad,y);x.textAlign='right';x.font='700 30px system-ui, sans-serif';x.fillText(`฿${(it.qty*it.price).toFixed(2)}`,W-pad,y);x.textAlign='left';x.font='30px system-ui, sans-serif';y+=rowH;});
  y+=24; x.strokeStyle='#d9e0e8';x.lineWidth=2;x.beginPath();x.moveTo(pad,y);x.lineTo(W-pad,y);x.stroke();y+=64;
- const lines=[['รวม',`${t.count} แก้ว`],['ยอดขาย',baht(t.sales)],['ต้นทุนรวม',baht(t.cost)],['กำไรจากการขาย',baht(t.profit)],['อัตรากำไร',pct(t.margin)]];
+ const lines=[['รวม',`${t.count} แก้ว`],['ยอดขาย',baht(t.sales)],['ต้นทุนรวม',baht(t.cost)],['กำไรขั้นต้น',baht(t.profit)],['กำไรขั้นต้น %',pct(t.margin)]];
  lines.forEach((r,i)=>{x.fillStyle=i>=2&&i===3?'#16834b':'#17202a';x.font=(i===1||i===3?'700 ':'')+'32px system-ui, sans-serif';x.fillText(r[0],pad,y);x.textAlign='right';x.fillText(r[1],W-pad,y);x.textAlign='left';y+=58;});
  c.toBlob(blob=>{if(!blob)return alert('สร้างรูปไม่สำเร็จ');const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Fighter-Coffee-${date}.png`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);},'image/png');
 }
