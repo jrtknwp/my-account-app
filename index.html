@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#17395f">
+<meta name="theme-color" content="#4BF285">
 <link rel="manifest" href="./manifest.webmanifest">
 <link rel="apple-touch-icon" href="./icons/icon-192.png">
 <title>Fighter Coffee</title>
@@ -52,6 +52,22 @@ button,input,select{font:inherit} button{cursor:pointer}
 .amount-wrap{position:relative}.amount-wrap input{padding-right:32px}.amount-unit{position:absolute;right:8px;top:50%;transform:translateY(-50%);font-size:11px;color:var(--muted);pointer-events:none}
 .table .sub{display:block}
 .month-summary{margin-top:18px}.month-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:9px}.month-select{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 9px;color:var(--navy);font-weight:700}.month-kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:9px}.month-kpi{background:#fff;border:1px solid var(--line);border-radius:14px;padding:12px}.month-kpi .label{font-size:11px;color:var(--muted)}.month-kpi b{display:block;font-size:19px;margin-top:3px}.daily-table{margin-top:10px}.date-bar{display:flex;align-items:center;justify-content:space-between;background:#fff;border:1px solid var(--line);border-radius:14px;padding:11px 13px;margin-bottom:12px;box-shadow:var(--shadow);font-weight:700}.date-bar span{font-size:14px}.date-bar input{border:0;outline:0;background:#f5f7fa;border-radius:9px;padding:7px 8px;font-weight:600;color:var(--navy)}
+
+/* Fighter Coffee v8: visual theme only; no data model or layout changes */
+:root{--navy:#4BF285;--navy2:#4BF285;--bg:#111315;--card:#242628;--text:#F7F8F8;--muted:#ADB4B9;--line:#3B3F42;--green:#4BF285;--greenbg:#153C2B;--orange:#F2AE57;--orangebg:#3B2A17;--red:#FF7777;--shadow:0 4px 18px rgba(0,0,0,.18)}
+.top{background:#4BF285;color:#101713}
+.top small,.top .date{opacity:.85}
+.card,.row,.table,.menu-card,.month-kpi,.date-bar,.sheet{background:var(--card);color:var(--text)}
+.bottom{background:rgba(24,26,28,.97)}
+.nav{color:#A0A7AB}.nav.active{color:var(--green)}
+.primary{background:var(--green);color:#101713}
+.section button,.pill{background:#183C2C;color:var(--green)}
+.search,.qty button,.qty-input,.field input,.field select,.editor-recipe-row select,.editor-recipe-row input,.month-select,.date-bar input,.secondary{background:#303336;color:var(--text);border-color:var(--line)}
+.search::placeholder,input::placeholder{color:#A8B0B4}
+.th,.stat,#purchase-master{background:#303336!important;color:var(--text)}
+.stat span,.month-kpi .label,.kpi .label{color:var(--muted)}
+.progress{background:#3B3F42}
+@media(min-width:700px){body{background:#0B0D0E}.app{background:var(--bg);box-shadow:0 0 40px rgba(0,0,0,.35)}}
 </style>
 </head>
 <body>
@@ -183,20 +199,21 @@ function renderSales(){
 }
 async function saveSalesImage(){
  const date=key(), t=totalsForDate(date), data=state.sales[date]||{};
- const items=state.menus.map(m=>({name:m.name,qty:Number(data[m.name]||0),price:saleUnitInfo(date,m.name).price})).filter(x=>x.qty>0);
- const W=1080, pad=76, rowH=64, H=Math.max(1050,760+items.length*rowH);
- const c=document.createElement('canvas'); c.width=W; c.height=H; const x=c.getContext('2d');
- x.fillStyle='#f5f7fa'; x.fillRect(0,0,W,H);
- x.fillStyle='#17395f'; x.fillRect(0,0,W,220);
- x.fillStyle='#fff'; x.font='700 52px system-ui, sans-serif'; x.fillText('Fighter Coffee ☕',pad,92);
- x.font='32px system-ui, sans-serif'; x.fillText(new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'long',year:'numeric'}).format(new Date(date+'T00:00:00')),pad,150);
- x.fillStyle='#17202a'; x.font='700 38px system-ui, sans-serif'; x.fillText('สรุปยอดขาย',pad,300);
- let y=365; x.font='30px system-ui, sans-serif';
- if(!items.length){x.fillStyle='#718096';x.fillText('ยังไม่มียอดขายในวันนี้',pad,y);y+=rowH;}
- items.forEach(it=>{x.fillStyle='#17202a';x.fillText(`${it.name}  ${it.qty} แก้ว`,pad,y);x.textAlign='right';x.font='700 30px system-ui, sans-serif';x.fillText(`฿${(it.qty*it.price).toFixed(2)}`,W-pad,y);x.textAlign='left';x.font='30px system-ui, sans-serif';y+=rowH;});
- y+=24; x.strokeStyle='#d9e0e8';x.lineWidth=2;x.beginPath();x.moveTo(pad,y);x.lineTo(W-pad,y);x.stroke();y+=64;
+ const items=state.menus.map(m=>({name:m.name,qty:Number(data[m.name]||0),price:saleUnitInfo(date,m.name).price})).filter(it=>it.qty>0);
+ const W=1080,pad=76,rowH=74,headerH=220;
+ const H=Math.max(1050, 680+items.length*rowH);
+ const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
+ x.fillStyle='#151719';x.fillRect(0,0,W,H);
+ x.fillStyle='#4BF285';x.fillRect(0,0,W,headerH);
+ x.fillStyle='#101713';x.textAlign='left';x.font='700 52px system-ui, sans-serif';x.fillText('Fighter Coffee ☕',pad,92);
+ x.font='32px system-ui, sans-serif';x.fillText(new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'long',year:'numeric'}).format(new Date(date+'T00:00:00')),pad,150);
+ x.fillStyle='#FFFFFF';x.font='700 38px system-ui, sans-serif';x.fillText('สรุปยอดขาย',pad,300);
+ let y=365;
+ if(!items.length){x.fillStyle='#B8BEC2';x.font='30px system-ui, sans-serif';x.fillText('ยังไม่มียอดขายในวันนี้',pad,y);y+=rowH;}
+ items.forEach(it=>{x.fillStyle='#FFFFFF';x.textAlign='left';x.font='30px system-ui, sans-serif';x.fillText(`${it.name}  ${it.qty} แก้ว`,pad,y);x.textAlign='right';x.font='700 30px system-ui, sans-serif';x.fillText(`฿${(it.qty*it.price).toFixed(2)}`,W-pad,y);y+=rowH;});
+ y+=24;x.strokeStyle='#50565A';x.lineWidth=2;x.beginPath();x.moveTo(pad,y);x.lineTo(W-pad,y);x.stroke();y+=64;
  const lines=[['รวม',`${t.count} แก้ว`],['ยอดขาย',baht(t.sales)],['ต้นทุนรวม',baht(t.cost)],['กำไรขั้นต้น',baht(t.profit)],['กำไรขั้นต้น %',pct(t.margin)]];
- lines.forEach((r,i)=>{x.fillStyle=i>=2&&i===3?'#16834b':'#17202a';x.font=(i===1||i===3?'700 ':'')+'32px system-ui, sans-serif';x.fillText(r[0],pad,y);x.textAlign='right';x.fillText(r[1],W-pad,y);x.textAlign='left';y+=58;});
+ lines.forEach((r,i)=>{x.fillStyle=i===1?'#4BF285':'#FFFFFF';x.font=(i===1||i===3?'700 ':'')+'32px system-ui, sans-serif';x.textAlign='left';x.fillText(r[0],pad,y);x.textAlign='right';x.fillText(r[1],W-pad,y);y+=58;});
  c.toBlob(blob=>{if(!blob)return alert('สร้างรูปไม่สำเร็จ');const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=`Fighter-Coffee-${date}.png`;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1500);},'image/png');
 }
 
