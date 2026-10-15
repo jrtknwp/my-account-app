@@ -122,6 +122,7 @@ let oldState=JSON.parse(localStorage.getItem("cafeAppV1")||"null");
 let state=oldState||{ingredients:defaultIngredients,menus:defaultMenus,sales:{},saleMeta:{},purchases:[],selectedDate:new Date().toISOString().slice(0,10),summaryMonth:new Date().toISOString().slice(0,7)};
 if(!state.selectedDate) state.selectedDate=new Date().toISOString().slice(0,10);
 if(!state.summaryMonth) state.summaryMonth=state.selectedDate.slice(0,7);
+if(!state.summaryYear) state.summaryYear=state.summaryMonth.slice(0,4);
 if(!state.saleMeta) state.saleMeta={};
 if(!state.purchases) state.purchases=[];
 if(!state.ingredients || !Array.isArray(state.ingredients)) state.ingredients=defaultIngredients;
@@ -157,9 +158,66 @@ function monthSummary(ym){
  const purchaseSpend=state.purchases.filter(x=>x.date?.startsWith(ym)).reduce((sum,x)=>sum+Number(x.totalPaid ?? x.price ?? 0),0);
  return {sales,cost,profit:sales-cost,count,margin:sales?sales-cost>=0?(sales-cost)/sales*100:0:0,days,purchaseSpend,cashNet:sales-purchaseSpend};
 }
+function monthMenuBreakdown(ym){
+ const out=new Map();
+ Object.entries(state.sales||{}).filter(([date])=>date.startsWith(ym)).forEach(([date,entries])=>{
+  Object.entries(entries||{}).forEach(([name,qRaw])=>{
+   const qty=Math.max(0,Number(qRaw)||0);if(!qty)return;
+   const unit=saleUnitInfo(date,name),r=out.get(name)||{name,qty:0,sales:0,cost:0};
+   r.qty+=qty;r.sales+=qty*unit.price;r.cost+=qty*unit.cost;out.set(name,r);
+  });
+ });
+ return [...out.values()].sort((a,b)=>b.qty-a.qty||a.name.localeCompare(b.name,'th'));
+}
+function annualSummary(year){
+ const months=Array.from({length:12},(_,i)=>`${year}-${String(i+1).padStart(2,'0')}`);
+ const rows=months.map(ym=>({ym,...monthSummary(ym)}));
+ return {rows,sales:rows.reduce((n,r)=>n+r.sales,0),cost:rows.reduce((n,r)=>n+r.cost,0),count:rows.reduce((n,r)=>n+r.count,0),purchaseSpend:rows.reduce((n,r)=>n+r.purchaseSpend,0)};
+}
+function monthLabel(ym){return new Intl.DateTimeFormat('th-TH',{month:'long',year:'numeric'}).format(new Date(ym+'-01T00:00:00'));}
+function monthShort(ym){return new Intl.DateTimeFormat('th-TH',{month:'short'}).format(new Date(ym+'-01T00:00:00'));}
 function renderMonthSummary(ym){
- const m=monthSummary(ym);
- return `<div class="month-summary"><div class="month-head"><h2 style="font-size:17px;margin:0">📊 สรุปประจำเดือน</h2><input class="month-select" type="month" value="${ym}" onchange="changeSummaryMonth(this.value)"></div><div class="month-kpis"><div class="month-kpi"><div class="label">ยอดขายรวม</div><b>${baht(m.sales)}</b></div><div class="month-kpi"><div class="label">ต้นทุนขาย</div><b>${baht(m.cost)}</b></div><div class="month-kpi"><div class="label">กำไรรวม</div><b style="color:var(--green)">${baht(m.profit)}</b></div><div class="month-kpi"><div class="label">กำไร %</div><b>${pct(m.margin)}</b></div><div class="month-kpi"><div class="label">เงินซื้อของ</div><b style="color:var(--orange)">${baht(m.purchaseSpend)}</b></div><div class="month-kpi"><div class="label">เงินสดสุทธิ*</div><b>${baht(m.cashNet)}</b></div></div><div class="sub" style="margin-top:8px">* ยอดขาย − เงินที่จ่ายซื้อของในเดือนนั้น ไม่ใช่กำไรทางบัญชี</div><div class="section"><h2>ยอดขายรายวัน</h2><span class="pill">${m.count} แก้ว</span></div><div class="table daily-table"><div class="tr th"><span>วันที่</span><span class="right">ขาย</span><span class="right">ต้นทุน</span><span class="right">กำไร</span></div>${m.days.length?m.days.map(d=>`<div class="tr"><span>${new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'short'}).format(new Date(d.date+'T00:00:00'))}</span><span class="right">${baht(d.sales)}</span><span class="right">${baht(d.cost)}</span><span class="right profit">${baht(d.profit)}</span></div>`).join(''):`<div class="empty">ยังไม่มียอดขายในเดือนนี้</div>`}</div></div>`;
+ const m=monthSummary(ym), year=String(state.summaryYear||ym.slice(0,4));
+ const annual=annualSummary(year),menu=monthMenuBreakdown(ym);
+ const years=[...new Set([year,ym.slice(0,4),...Object.keys(state.sales||{}).map(d=>d.slice(0,4))])].filter(y=>/^\d{4}$/.test(y)).sort((a,b)=>b.localeCompare(a));
+ return `<div class="month-summary">
+ <div class="month-head"><h2 style="font-size:17px;margin:0">📊 สรุปประจำเดือน</h2><input class="month-select" type="month" value="${ym}" onchange="changeSummaryMonth(this.value)"></div>
+ <div class="month-kpis"><div class="month-kpi"><div class="label">ยอดขายรวม</div><b>${baht(m.sales)}</b></div><div class="month-kpi"><div class="label">ต้นทุนขาย</div><b>${baht(m.cost)}</b></div><div class="month-kpi"><div class="label">กำไรรวม</div><b style="color:var(--green)">${baht(m.profit)}</b></div><div class="month-kpi"><div class="label">กำไร %</div><b>${pct(m.margin)}</b></div><div class="month-kpi"><div class="label">เงินซื้อของ</div><b style="color:var(--orange)">${baht(m.purchaseSpend)}</b></div><div class="month-kpi"><div class="label">เงินสดสุทธิ*</div><b>${baht(m.cashNet)}</b></div></div>
+ <div class="sub" style="margin-top:8px">* ยอดขาย − เงินที่จ่ายซื้อของในเดือนนั้น ไม่ใช่กำไรทางบัญชี</div>
+ <button class="primary" style="width:100%;margin-top:12px;padding:12px" onclick="saveMonthlyImage()">📸 บันทึกรูปสรุปเดือนนี้ (PNG)</button>
+ <div class="section"><h2>☕ รายละเอียดเมนูที่ขายในเดือนนี้</h2><span class="pill">${m.count} แก้ว</span></div>
+ <div class="table daily-table"><div class="tr th" style="grid-template-columns:1.5fr .7fr 1fr"><span>เมนู</span><span class="right">แก้ว</span><span class="right">ยอดขาย</span></div>${menu.length?menu.map(it=>`<div class="tr" style="grid-template-columns:1.5fr .7fr 1fr"><span>${escapeHtml(it.name)}</span><span class="right">${it.qty}</span><span class="right">${baht(it.sales)}</span></div>`).join(''):'<div class="empty">ยังไม่มีรายการขายในเดือนนี้</div>'}</div>
+ <div class="section"><h2>ยอดขายรายวัน</h2><span class="pill">${m.count} แก้ว</span></div><div class="table daily-table"><div class="tr th"><span>วันที่</span><span class="right">ขาย</span><span class="right">ต้นทุน</span><span class="right">กำไร</span></div>${m.days.length?m.days.map(d=>`<div class="tr"><span>${new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'short'}).format(new Date(d.date+'T00:00:00'))}</span><span class="right">${baht(d.sales)}</span><span class="right">${baht(d.cost)}</span><span class="right profit">${baht(d.profit)}</span></div>`).join(''):'<div class="empty">ยังไม่มียอดขายในเดือนนี้</div>'}</div>
+ <div class="section" style="margin-top:24px"><h2>📊 ยอดขายรายเดือน</h2><select class="month-select" aria-label="เลือกปี" onchange="changeSummaryYear(this.value)">${years.map(y=>`<option value="${y}" ${y===year?'selected':''}>ปี ${Number(y)+543}</option>`).join('')}</select></div>
+ <div class="table daily-table"><div class="tr th"><span>เดือน</span><span class="right">ขาย</span><span class="right">ต้นทุน</span><span class="right">กำไร</span></div>${annual.rows.map(r=>`<div class="tr"><span>${monthShort(r.ym)}</span><span class="right">${baht(r.sales)}</span><span class="right">${baht(r.cost)}</span><span class="right profit">${baht(r.profit)}</span></div>`).join('')}<div class="tr" style="font-weight:800"><span>รวมปี</span><span class="right">${baht(annual.sales)}</span><span class="right">${baht(annual.cost)}</span><span class="right profit">${baht(annual.sales-annual.cost)}</span></div></div>
+ <div class="card" style="margin-top:10px"><div style="display:flex;justify-content:space-between"><span>จำนวนแก้วรวมทั้งปี</span><b>${annual.count} แก้ว</b></div><div style="display:flex;justify-content:space-between;margin-top:8px;color:var(--green)"><span>ยอดขายรวมทั้งปี</span><b>${baht(annual.sales)}</b></div></div>
+ <button class="primary" style="width:100%;margin-top:12px;padding:12px" onclick="saveAnnualImage()">📸 บันทึกรูปสรุปทั้งปี (PNG)</button>
+ </div>`;
+}
+function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
+function changeSummaryYear(v){if(/^\d{4}$/.test(v)){state.summaryYear=v;save();renderSales();}}
+function drawReportImage({title,subtitle,rows,totals,fileName}){
+ const W=1080,pad=76,rowH=66,headH=220,top=340;
+ const H=Math.max(880,top+rows.length*rowH+80+totals.length*64+100);
+ const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
+ ctx.fillStyle='#151719';ctx.fillRect(0,0,W,H);ctx.fillStyle='#4BF285';ctx.fillRect(0,0,W,headH);
+ ctx.fillStyle='#101713';ctx.textAlign='left';ctx.font='700 52px system-ui,sans-serif';ctx.fillText('Fighter Coffee ☕',pad,92);ctx.font='32px system-ui,sans-serif';ctx.fillText(subtitle,pad,152);
+ ctx.fillStyle='#fff';ctx.font='700 38px system-ui,sans-serif';ctx.fillText(title,pad,295);
+ let y=top;ctx.font='29px system-ui,sans-serif';
+ if(!rows.length){ctx.fillStyle='#b8bec2';ctx.fillText('ยังไม่มีข้อมูลยอดขาย',pad,y);y+=rowH;}
+ rows.forEach(row=>{ctx.fillStyle='#fff';ctx.textAlign='left';ctx.font='29px system-ui,sans-serif';ctx.fillText(row[0],pad,y);ctx.textAlign='right';ctx.font='700 29px system-ui,sans-serif';ctx.fillText(row[1],W-pad,y);y+=rowH;});
+ y+=12;ctx.strokeStyle='#50565A';ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(pad,y);ctx.lineTo(W-pad,y);ctx.stroke();y+=62;
+ totals.forEach(([label,value,green,bold])=>{ctx.fillStyle=green?'#4BF285':'#fff';ctx.font=(bold?'700 ':'')+'32px system-ui,sans-serif';ctx.textAlign='left';ctx.fillText(label,pad,y);ctx.textAlign='right';ctx.fillText(value,W-pad,y);y+=64;});
+ canvas.toBlob(blob=>{if(!blob){alert('สร้างรูปไม่สำเร็จ');return;}const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=fileName;document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),10000);},'image/png');
+}
+function saveMonthlyImage(){
+ const ym=state.summaryMonth||key().slice(0,7),m=monthSummary(ym),menu=monthMenuBreakdown(ym);
+ drawReportImage({title:'สรุปยอดขายรายเดือน',subtitle:monthLabel(ym),rows:menu.map(it=>[`${it.name}  ${it.qty} แก้ว`,baht(it.sales)]),totals:[['รวม',`${m.count} แก้ว`,false,false],['ยอดขาย',baht(m.sales),true,true],['ต้นทุนรวม',baht(m.cost),false,false],['กำไรขั้นต้น',baht(m.profit),false,true],['กำไรขั้นต้น %',pct(m.margin),false,false]],fileName:`Fighter-Coffee-Month-${ym}.png`});
+}
+function saveAnnualImage(){
+ const year=String(state.summaryYear||state.summaryMonth?.slice(0,4)||key().slice(0,4)),a=annualSummary(year),rows=a.rows.filter(r=>r.count||r.sales).map(r=>[monthShort(r.ym),`${baht(r.sales)}  (${r.count} แก้ว)`]);
+ const margin=a.sales?(a.sales-a.cost)/a.sales*100:0;
+ drawReportImage({title:'สรุปยอดขายรายปี',subtitle:`ปี ${Number(year)+543}`,rows,totals:[['รวม',`${a.count} แก้ว`,false,false],['ยอดขาย',baht(a.sales),true,true],['ต้นทุนรวม',baht(a.cost),false,false],['กำไรขั้นต้น',baht(a.sales-a.cost),false,true],['กำไรขั้นต้น %',pct(margin),false,false]],fileName:`Fighter-Coffee-Year-${year}.png`});
 }
 function changeSummaryMonth(v){if(v){state.summaryMonth=v;save();renderSales();}}
 function setPage(p){
