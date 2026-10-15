@@ -68,18 +68,25 @@ button,input,select{font:inherit} button{cursor:pointer}
 .stat span,.month-kpi .label,.kpi .label{color:var(--muted)}
 .progress{background:#3B3F42}
 @media(min-width:700px){body{background:#0B0D0E}.app{background:var(--bg);box-shadow:0 0 40px rgba(0,0,0,.35)}}
+/* v10: five-tab navigation and logo; no changes to stored data */
+.brand-logo{display:block;width:178px;max-width:65%;height:auto;object-fit:contain;margin:0 0 8px}
+.bottom{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
+.nav{min-width:0;font-size:10px;padding:6px 1px;white-space:nowrap}
+.nav .ico{font-size:20px}
+@media(max-width:360px){.nav{font-size:9px}.nav .ico{font-size:18px}}
 </style>
 </head>
 <body>
 <div class="app">
   <header class="top">
-    <small>FIGHTER COFFEE</small>
+    <img class="brand-logo" src="./fighter-logo.png" alt="FIGHTER URBAN COFFEE">
     <h1 id="title">ยอดขายวันนี้</h1>
     <div class="date" id="today"></div>
   </header>
   <main class="content" id="content"></main>
   <nav class="bottom">
     <button class="nav active" data-page="sales"><span class="ico">🧾</span>ขายวันนี้</button>
+    <button class="nav" data-page="reports"><span class="ico">📊</span>สรุปยอดขาย</button>
     <button class="nav" data-page="menus"><span class="ico">☕</span>ต้นทุนเมนู</button>
     <button class="nav" data-page="ingredients"><span class="ico">📦</span>วัตถุดิบ</button>
     <button class="nav" data-page="purchases"><span class="ico">🛒</span>ซื้อของ</button>
@@ -195,7 +202,7 @@ function renderMonthSummary(ym){
  </div>`;
 }
 function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
-function changeSummaryYear(v){if(/^\d{4}$/.test(v)){state.summaryYear=v;save();renderSales();}}
+function changeSummaryYear(v){if(/^\d{4}$/.test(v)){state.summaryYear=v;save();renderReports();}}
 function drawReportImage({title,subtitle,rows,totals,fileName}){
  const W=1080,pad=76,rowH=66,headH=220,top=340;
  const H=Math.max(880,top+rows.length*rowH+80+totals.length*64+100);
@@ -219,11 +226,14 @@ function saveAnnualImage(){
  const margin=a.sales?(a.sales-a.cost)/a.sales*100:0;
  drawReportImage({title:'สรุปยอดขายรายปี',subtitle:`ปี ${Number(year)+543}`,rows,totals:[['รวม',`${a.count} แก้ว`,false,false],['ยอดขาย',baht(a.sales),true,true],['ต้นทุนรวม',baht(a.cost),false,false],['กำไรขั้นต้น',baht(a.sales-a.cost),false,true],['กำไรขั้นต้น %',pct(margin),false,false]],fileName:`Fighter-Coffee-Year-${year}.png`});
 }
-function changeSummaryMonth(v){if(v){state.summaryMonth=v;save();renderSales();}}
+function changeSummaryMonth(v){if(v){state.summaryMonth=v;save();renderReports();}}
+function renderReports(){
+ document.getElementById("content").innerHTML=renderMonthSummary(state.summaryMonth||state.selectedDate.slice(0,7));
+}
 function setPage(p){
  document.querySelectorAll(".nav").forEach(x=>x.classList.toggle("active",x.dataset.page===p));
- document.getElementById("title").textContent={sales:"ยอดขายวันนี้",menus:"ต้นทุนและกำไรต่อเมนู",ingredients:"คลังวัตถุดิบ",purchases:"ซื้อของเข้าร้าน"}[p];
- ({sales:renderSales,menus:renderMenus,ingredients:renderIngredients,purchases:renderPurchases}[p])();
+ document.getElementById("title").textContent={sales:"ยอดขายวันนี้",reports:"สรุปยอดขาย",menus:"ต้นทุนและกำไรต่อเมนู",ingredients:"คลังวัตถุดิบ",purchases:"ซื้อของเข้าร้าน"}[p];
+ ({sales:renderSales,reports:renderReports,menus:renderMenus,ingredients:renderIngredients,purchases:renderPurchases}[p])();
 }
 document.querySelectorAll(".nav").forEach(x=>x.onclick=()=>setPage(x.dataset.page));
 function changeSaleDate(v){ if(!v)return; state.selectedDate=v; save(); renderSales(); }
@@ -253,7 +263,7 @@ function renderSales(){
    <div style="display:flex;justify-content:space-between;margin-top:8px"><span>อัตรากำไร</span><b>${pct(t.margin)}</b></div>
  </div>
  <button class="primary" style="width:100%;margin-top:10px;padding:12px" onclick="saveSalesImage()">📸 บันทึกรูปยอดขาย</button>
- ${renderMonthSummary(state.summaryMonth||state.selectedDate.slice(0,7))}`;
+ `;
 }
 async function saveSalesImage(){
  const date=key(), t=totalsForDate(date), data=state.sales[date]||{};
