@@ -69,7 +69,7 @@ button,input,select{font:inherit} button{cursor:pointer}
 .progress{background:#3B3F42}
 @media(min-width:700px){body{background:#0B0D0E}.app{background:var(--bg);box-shadow:0 0 40px rgba(0,0,0,.35)}}
 /* v10: five-tab navigation and logo; no changes to stored data */
-.brand-logo{display:block;width:178px;max-width:65%;height:auto;object-fit:contain;margin:0 0 8px}
+.brand-logo{display:block;width:138px;max-width:55%;height:auto;object-fit:contain;margin:0 auto 12px}
 .bottom{display:grid;grid-template-columns:repeat(5,minmax(0,1fr))}
 .nav{min-width:0;font-size:10px;padding:6px 1px;white-space:nowrap}
 .nav .ico{font-size:20px}
@@ -203,12 +203,21 @@ function renderMonthSummary(ym){
 }
 function escapeHtml(v){return String(v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));}
 function changeSummaryYear(v){if(/^\d{4}$/.test(v)){state.summaryYear=v;save();renderReports();}}
-function drawReportImage({title,subtitle,rows,totals,fileName}){
+// v11: Load the same logo used by the app before rendering PNG reports.
+function drawFighterLogo(ctx,W,top=30){
+ return new Promise(resolve=>{
+  const img=new Image();
+  img.onload=()=>{const maxW=310,maxH=112,ratio=Math.min(maxW/img.naturalWidth,maxH/img.naturalHeight);const w=img.naturalWidth*ratio,h=img.naturalHeight*ratio;ctx.drawImage(img,(W-w)/2,top,w,h);resolve();};
+  img.onerror=()=>{ctx.fillStyle='#101713';ctx.textAlign='center';ctx.font='700 48px system-ui,sans-serif';ctx.fillText('FIGHTER URBAN COFFEE',W/2,90);resolve();};
+  img.src='./fighter-logo.png';
+ });
+}
+async function drawReportImage({title,subtitle,rows,totals,fileName}){
  const W=1080,pad=76,rowH=66,headH=220,top=340;
- const H=Math.max(880,top+rows.length*rowH+80+totals.length*64+100);
+ const H=Math.max(880,top+Math.max(rows.length,1)*rowH+12+62+totals.length*64+115);
  const canvas=document.createElement('canvas');canvas.width=W;canvas.height=H;const ctx=canvas.getContext('2d');
  ctx.fillStyle='#151719';ctx.fillRect(0,0,W,H);ctx.fillStyle='#4BF285';ctx.fillRect(0,0,W,headH);
- ctx.fillStyle='#101713';ctx.textAlign='left';ctx.font='700 52px system-ui,sans-serif';ctx.fillText('Fighter Coffee ☕',pad,92);ctx.font='32px system-ui,sans-serif';ctx.fillText(subtitle,pad,152);
+ await drawFighterLogo(ctx,W,25);ctx.fillStyle='#101713';ctx.textAlign='center';ctx.font='32px system-ui,sans-serif';ctx.fillText(subtitle,W/2,177);
  ctx.fillStyle='#fff';ctx.font='700 38px system-ui,sans-serif';ctx.fillText(title,pad,295);
  let y=top;ctx.font='29px system-ui,sans-serif';
  if(!rows.length){ctx.fillStyle='#b8bec2';ctx.fillText('ยังไม่มีข้อมูลยอดขาย',pad,y);y+=rowH;}
@@ -269,12 +278,12 @@ async function saveSalesImage(){
  const date=key(), t=totalsForDate(date), data=state.sales[date]||{};
  const items=state.menus.map(m=>({name:m.name,qty:Number(data[m.name]||0),price:saleUnitInfo(date,m.name).price})).filter(it=>it.qty>0);
  const W=1080,pad=76,rowH=74,headerH=220;
- const H=Math.max(1050, 680+items.length*rowH);
+ const H=Math.max(1050,365+Math.max(items.length,1)*rowH+24+64+5*58+115);
  const c=document.createElement('canvas');c.width=W;c.height=H;const x=c.getContext('2d');
  x.fillStyle='#151719';x.fillRect(0,0,W,H);
  x.fillStyle='#4BF285';x.fillRect(0,0,W,headerH);
- x.fillStyle='#101713';x.textAlign='left';x.font='700 52px system-ui, sans-serif';x.fillText('Fighter Coffee ☕',pad,92);
- x.font='32px system-ui, sans-serif';x.fillText(new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'long',year:'numeric'}).format(new Date(date+'T00:00:00')),pad,150);
+ await drawFighterLogo(x,W,25);x.fillStyle='#101713';x.textAlign='center';
+ x.font='32px system-ui, sans-serif';x.fillText(new Intl.DateTimeFormat('th-TH',{day:'numeric',month:'long',year:'numeric'}).format(new Date(date+'T00:00:00')),W/2,177);
  x.fillStyle='#FFFFFF';x.font='700 38px system-ui, sans-serif';x.fillText('สรุปยอดขาย',pad,300);
  let y=365;
  if(!items.length){x.fillStyle='#B8BEC2';x.font='30px system-ui, sans-serif';x.fillText('ยังไม่มียอดขายในวันนี้',pad,y);y+=rowH;}
